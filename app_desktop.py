@@ -63,6 +63,40 @@ def check_ffmpeg():
     """Check if FFmpeg is installed or available"""
     return get_ffmpeg_path() is not None
 
+def is_playlist_or_channel(url):
+    """Check if URL is a playlist or channel (not a single video)"""
+    try:
+        # List of playlist/channel URL patterns
+        playlist_patterns = [
+            'playlist?list=',
+            '/playlist?',
+            'youtube.com/channel/',
+            'youtube.com/@',
+            'youtube.com/c/',
+            'youtube.com/user/channel/',
+            'tiktok.com/@',
+            'instagram.com/',
+            'youtube.com/watch?v=',  # Single video - not a playlist
+        ]
+        
+        url_lower = url.lower()
+        
+        # Check for single video (not playlist)
+        if 'youtube.com/watch?v=' in url_lower and 'playlist?list=' not in url_lower:
+            return False
+        
+        # Check for playlist indicator
+        if 'playlist' in url_lower and 'list=' in url_lower:
+            return True
+        
+        # Check for channel
+        if any(pattern in url_lower for pattern in ['youtube.com/channel/', 'youtube.com/@', 'youtube.com/c/', 'tiktok.com/@']):
+            return True
+        
+        return False
+    except:
+        return False
+
 def install_ffmpeg_auto():
     """Automatically download and install FFmpeg"""
     try:
@@ -229,6 +263,7 @@ class JstnDownloader:
         self.download_folder = self.get_download_folder()
         
         self.downloading = False
+        self.single_video_mode = False
         self.create_widgets()
         
     def setup_styles(self):
@@ -532,6 +567,25 @@ class JstnDownloader:
             messagebox.showerror("Error", "Please enter a video URL")
             return
         
+        # Check if URL is a playlist or channel
+        if is_playlist_or_channel(url):
+            response = messagebox.askyesno(
+                "Playlist/Channel Detected",
+                "This URL appears to be a playlist or channel.\n\n"
+                "YES → Download ONLY the first video\n"
+                "NO → Cancel (to avoid downloading multiple videos)\n\n"
+                "⚠️  This prevents accidental bulk downloads."
+            )
+            if not response:
+                self.log("→ Download cancelled by user", '#ffd700')
+                return
+            
+            # Add flag to download only first video
+            self.single_video_mode = True
+            self.log("⚠️  Playlist detected - downloading only first video", '#ffd700')
+        else:
+            self.single_video_mode = False
+        
         self.output_text.config(state=tk.NORMAL)
         self.output_text.delete(1.0, tk.END)
         self.output_text.config(state=tk.DISABLED)
@@ -612,6 +666,7 @@ class JstnDownloader:
                 'ignoreerrors': False,
                 'no_check_certificate': True,
                 'progress_hooks': [progress_hook],
+                'noplaylist': True if self.single_video_mode else False,  # Only download first video if playlist detected
             }
             
             # Add FFmpeg path if found
