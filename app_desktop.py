@@ -225,6 +225,9 @@ class JstnDownloader:
         # Configure style
         self.setup_styles()
         
+        # Initialize download folder
+        self.download_folder = self.get_download_folder()
+        
         self.downloading = False
         self.create_widgets()
         
@@ -242,6 +245,50 @@ class JstnDownloader:
             lightcolor='#1f6feb',
             darkcolor='#1f6feb'
         )
+    
+    def get_download_folder(self):
+        """Get saved download folder or default"""
+        config_file = os.path.join(os.path.expanduser('~'), 'AppData', 'Local', 'jstndownloader', 'download_path.txt')
+        
+        # Try to load saved path
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    saved_path = f.read().strip()
+                    if os.path.exists(saved_path):
+                        return saved_path
+            except:
+                pass
+        
+        # Default to Downloads folder
+        default_path = os.path.join(os.path.expanduser('~'), 'Downloads', 'jstndownloader')
+        os.makedirs(default_path, exist_ok=True)
+        self.save_download_folder(default_path)
+        return default_path
+    
+    def save_download_folder(self, path):
+        """Save download folder preference"""
+        try:
+            config_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Local', 'jstndownloader')
+            os.makedirs(config_dir, exist_ok=True)
+            config_file = os.path.join(config_dir, 'download_path.txt')
+            with open(config_file, 'w') as f:
+                f.write(path)
+        except:
+            pass
+    
+    def choose_download_folder(self):
+        """Open folder selection dialog"""
+        folder = filedialog.askdirectory(
+            title="Select Download Folder",
+            initialdir=os.path.dirname(self.download_folder)
+        )
+        
+        if folder:
+            self.download_folder = folder
+            self.save_download_folder(folder)
+            self.folder_info_label.config(text=f"📁 {os.path.basename(folder) if len(folder) < 30 else '...' + folder[-25:]}")
+            self.log(f"✓ Download folder changed to: {folder}", '#51cf66')
     
     def create_widgets(self):
         """Create the UI elements with modern professional design"""
@@ -364,6 +411,37 @@ class JstnDownloader:
             cursor='hand2'
         )
         folder_btn.pack(side=tk.LEFT)
+        
+        choose_folder_btn = tk.Button(
+            button_frame,
+            text="📂 Choose Download Folder",
+            command=self.choose_download_folder,
+            font=('Segoe UI', 10),
+            bg='#30363d',
+            fg='#c9d1d9',
+            activebackground='#3d444d',
+            activeforeground='#1f6feb',
+            border=0,
+            padx=28,
+            pady=9,
+            cursor='hand2'
+        )
+        choose_folder_btn.pack(side=tk.LEFT, padx=(8, 0))
+        
+        # Current download folder info
+        folder_info_frame = tk.Frame(main_frame, bg='#0d1117')
+        folder_info_frame.pack(fill=tk.X, pady=(0, 12))
+        
+        tk.Label(folder_info_frame, text="Download Location", font=('Segoe UI', 9, 'bold'), bg='#0d1117', fg='#8b949e').pack(anchor=tk.W)
+        
+        self.folder_info_label = tk.Label(
+            folder_info_frame,
+            text=f"📁 {os.path.basename(self.download_folder)}",
+            font=('Segoe UI', 9),
+            bg='#0d1117',
+            fg='#1f6feb'
+        )
+        self.folder_info_label.pack(anchor=tk.W, pady=(2, 0))
         
         # Progress bar with label
         progress_container = tk.Frame(main_frame, bg='#0d1117')
@@ -528,7 +606,7 @@ class JstnDownloader:
                         pass
             
             ydl_opts_base = {
-                'outtmpl': os.path.join(DOWNLOAD_FOLDER, '%(title)s.%(ext)s'),
+                'outtmpl': os.path.join(self.download_folder, '%(title)s.%(ext)s'),
                 'quiet': False,
                 'no_warnings': False,
                 'ignoreerrors': False,
@@ -574,7 +652,7 @@ class JstnDownloader:
                         download_success = True
                         self.progress['value'] = 100
                         self.log(f"✓ Successfully downloaded with best quality: {title}", '#51cf66')
-                        self.log(f"✓ Saved to: {DOWNLOAD_FOLDER}", '#51cf66')
+                        self.log(f"✓ Saved to: {self.download_folder}", '#51cf66')
                         messagebox.showinfo("Success", f"Best Quality Download Complete!\n\n{title}\n\nSaved to downloads folder")
                         return
                         
@@ -665,7 +743,7 @@ class JstnDownloader:
                 self.progress['value'] = 100
                 msg = "downloaded with audio" if ffmpeg_failed else "successfully downloaded"
                 self.log(f"✓ Video {msg}: {title}", '#51cf66')
-                self.log(f"✓ Saved to: {DOWNLOAD_FOLDER}", '#51cf66')
+                self.log(f"✓ Saved to: {self.download_folder}", '#51cf66')
                 if ffmpeg_failed and quality != 'audio':
                     self.log("💡 Tip: Install FFmpeg for BEST quality video + audio merge", '#8b949e')
                 messagebox.showinfo("Success", f"Download completed!\n\n{title}\n\nSaved to downloads folder")
@@ -715,22 +793,22 @@ class JstnDownloader:
         """Open downloads folder using native file explorer"""
         try:
             # Create folder if it doesn't exist
-            os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+            os.makedirs(self.download_folder, exist_ok=True)
             
             # Use subprocess with explicit explorer command on Windows
             if sys.platform == 'win32':
                 # Windows - use explorer.exe directly
-                subprocess.Popen(f'explorer "{os.path.abspath(DOWNLOAD_FOLDER)}"')
+                subprocess.Popen(f'explorer "{os.path.abspath(self.download_folder)}"')
             elif sys.platform == 'darwin':
                 # macOS - use open command
-                subprocess.Popen(['open', DOWNLOAD_FOLDER])
+                subprocess.Popen(['open', self.download_folder])
             else:
                 # Linux - use xdg-open
-                subprocess.Popen(['xdg-open', DOWNLOAD_FOLDER])
+                subprocess.Popen(['xdg-open', self.download_folder])
             
             self.log("📂 Opening folder...", '#51cf66')
         except Exception as e:
-            messagebox.showerror("Error", f"Could not open folder: {str(e)}\n\nFolder path: {DOWNLOAD_FOLDER}")
+            messagebox.showerror("Error", f"Could not open folder: {str(e)}\n\nFolder path: {self.download_folder}")
             self.log(f"❌ Could not open folder: {str(e)}", '#ff6b6b')
 
 if __name__ == '__main__':
