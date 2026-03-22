@@ -1,0 +1,37 @@
+# Build and distribution
+build/
+build-desktop/
+dist/
+dist-desktop/
+
+# Downloaded videos
+downloads/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environment
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+
+# FFmpeg config
+ffmpeg_path.txt
+AppData/
